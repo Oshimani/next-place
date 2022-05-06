@@ -19,8 +19,6 @@ const initializeField = (dimX: number, dimY: number) => {
 let field = initializeField(64, 64)
 
 const updateField = (pixel: Pixel) => {
-  console.log("update field", field, pixel);
-
   if (field) {
       const { x, y, color } = pixel
       field[y][x].color = color
@@ -46,7 +44,7 @@ const SocketHandler = (req: NextApiRequest, res: any) => {
       socket.on(SocketEvents.CLAIM_PIXEL, (pixel: Pixel) => {
         field = updateField(pixel)!
         // send updated pixel to all users
-        socket.broadcast.emit(SocketEvents.UPDATE_PIXEL, field)
+        socket.broadcast.emit(SocketEvents.UPDATE_PIXEL, pixel)
       })
     })
 

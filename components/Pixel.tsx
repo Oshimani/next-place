@@ -21,7 +21,7 @@ const Pixel = (props: { pixel: Pixel }) => {
 
     return (
         <div ref={ref}
-            onClick={() => handleOnClick()}
+            onMouseDown={() => handleOnClick()}
             style={{
                 height: size, width: size,
                 backgroundColor: color,

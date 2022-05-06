@@ -24,12 +24,12 @@ const Game: NextPage = () => {
 
     const [field, setField] = useState<Field | null>(null)
 
-    const updateField = (pixel: Pixel) => {
+    const updateField = (pixel: Pixel, field: Field) => {
         // console.log("update field", field, pixel);
 
         if (field) {
             const { x, y, color } = pixel
-            field[x][y].color = color
+            field[y][x].color = color
             return [...field]
         }
         return null
@@ -53,7 +53,7 @@ const Game: NextPage = () => {
 
         socket.on(SocketEvents.UPDATE_PIXEL, (pixel) => {
             console.log("Pixel updated from server", pixel)
-            setField(pixel)
+            setField((prefField) => (updateField(pixel, prefField!)))
         })
     }
 
@@ -64,8 +64,6 @@ const Game: NextPage = () => {
     }
 
     useEffect(() => {
-        console.log("Game mount");
-
         initializeSocket()
         return () => disconnectSocket()
     }, [])
