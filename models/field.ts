@@ -1,0 +1,1 @@
+export type Field = Array<Array<{ x: number, y: number, color: string }>>
