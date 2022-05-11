@@ -1,5 +1,5 @@
 import React, { useContext } from 'react'
-import { Button, SimpleGrid } from '@mantine/core'
+import { Button, SimpleGrid, Text } from '@mantine/core'
 import AppContext from '../contexts/AppContext'
 
 const ColorPalette = () => {
@@ -11,8 +11,9 @@ const ColorPalette = () => {
     return (
         <div>
             <SimpleGrid cols={1}>
+                <Text>Pick your color</Text>
                 {colors.map(color =>
-                    <Button onClick={() => setSelectedColor(color)} key={color}
+                    <Button disabled={selectedColor === color} onClick={() => setSelectedColor(color)} key={color}
                         variant={color === "white" ? "white" : "filled"}
                         color={color === "black" ? "dark" : color}>
                     </Button>

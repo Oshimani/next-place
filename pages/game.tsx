@@ -1,13 +1,11 @@
 import type { NextPage } from 'next'
-import Head from 'next/head'
 import Link from 'next/link';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 import io, { Socket } from 'socket.io-client'
 
-
-import { AppShell, Navbar, Header } from '@mantine/core';
+import { AppShell, Navbar, Header, useMantineTheme, Center, Title } from '@mantine/core';
 
 import Map from '../components/Map'
 import { Field } from '../models/field';
@@ -20,6 +18,8 @@ let socket: Socket
 
 const Game: NextPage = () => {
 
+    const theme = useMantineTheme()
+
     const [selectedColor, setSelectedColor] = useState<string | null>(null)
 
     const [field, setField] = useState<Field | null>(null)
@@ -30,7 +30,7 @@ const Game: NextPage = () => {
         if (field) {
             const { x, y, color } = pixel
             field[y][x].color = color
-            return [...field]
+            return field
         }
         return null
     }
@@ -51,16 +51,17 @@ const Game: NextPage = () => {
             setField([...newField])
         })
 
+
+        // todo maybe move this to map component
         socket.on(SocketEvents.UPDATE_PIXEL, (pixel) => {
             console.log("Pixel updated from server", pixel)
+            // prevent stale closure
             setField((prefField) => (updateField(pixel, prefField!)))
         })
     }
 
     const disconnectSocket = () => {
-        // console.log("Dismount");
-
-        // socket?.disconnect()
+        socket?.disconnect()
     }
 
     useEffect(() => {
@@ -72,9 +73,19 @@ const Game: NextPage = () => {
     return (
         <AppContext.Provider value={{ selectedColor, setSelectedColor, socket }}>
 
-            <AppShell padding={"md"}
-                header={<Link href="/"><Header height={60} p="md">Header</Header></Link>}
-                navbar={<Navbar width={{ base: 300 }} p='md'><ColorPalette /></Navbar>}>
+            <AppShell padding={0}
+                header={
+                    <Center pt='lg' pb='sm' sx={{ backgroundColor: theme.primaryColor, color: theme.white }}>
+                        <Link href="/"><Title sx={{ cursor: "pointer" }}>Next-Place</Title></Link>
+                    </Center>
+                }
+                navbar={
+                    <Navbar sx={{ backgroundColor: theme.colors.dark[0] }}
+                        width={{ base: 300, sm: 100 }}
+                        p="md">
+                        <ColorPalette />
+                    </Navbar>
+                }>
                 <>
                     {field ?
                         <Map field={field} />
