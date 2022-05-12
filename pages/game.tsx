@@ -70,8 +70,8 @@ const Game: NextPage = () => {
             setField((prefField) => (updateField(pixel, prefField!)))
         })
 
-        socket.on(SocketEvents.CLAIM_PIXEL_FAILED, (lock: IUserLockResult) => {
-            console.log("You may not claim another pixel yet")
+        socket.on(SocketEvents.CLAIM_PIXEL_FAILED, (response: { remainingTimeout: number }) => {
+            console.log(`You may not claim another pixel yet for another ${response.remainingTimeout} seconds`)
         })
 
         socket.on(SocketEvents.NEW_USER, (userId) => {

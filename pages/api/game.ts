@@ -1,7 +1,7 @@
-import { add } from 'date-fns'
-import { MongoClient } from 'mongodb'
+import { differenceInSeconds } from 'date-fns'
 import { NextApiRequest, NextApiResponse } from 'next'
 import { Server } from 'socket.io'
+import { USER_TIMEOUT_IN_SECONDS } from '../../config/game.config'
 import { DatabaseService, IUserLockResult } from '../../lib/mongodb'
 import { SocketEvents } from '../../models/events'
 import { Field } from '../../models/field'
@@ -29,7 +29,6 @@ const updateField = (pixel: Pixel) => {
   }
   return null
 }
-
 
 let dbService: DatabaseService
 
@@ -80,7 +79,8 @@ const SocketHandler = async (req: NextApiRequest, res: any) => {
           io.emit(SocketEvents.UPDATE_PIXEL, pixel)
         }
         else {
-          io.to(socket.id).emit(SocketEvents.CLAIM_PIXEL_FAILED, claimFail)
+          const remainingTimeout = USER_TIMEOUT_IN_SECONDS - differenceInSeconds(new Date(), claimFail!.created!)
+          io.to(socket.id).emit(SocketEvents.CLAIM_PIXEL_FAILED, { remainingTimeout })
         }
       })
     })
