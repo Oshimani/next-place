@@ -1,0 +1,1 @@
+export const USER_TIMEOUT_IN_SECONDS: number = 60 
