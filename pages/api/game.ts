@@ -7,7 +7,7 @@ import { SocketEvents } from '../../models/events'
 import { Field } from '../../models/field'
 import { Pixel } from '../../models/pixel'
 
-const initializeField = (dimX: number, dimY: number) => {
+export const initializeField = (dimX: number, dimY: number) => {
   let f: Field = []
   for (let y = 0; y < dimY; y++) {
     let row: Array<Pixel> = []

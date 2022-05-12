@@ -2,11 +2,14 @@ import { ObjectID } from "bson"
 import { add } from "date-fns"
 import { MongoClient } from "mongodb"
 
-import { USER_TIMEOUT_IN_SECONDS } from "../config/game.config"
+import { FIELD_HEIGHT, FIELD_WIDTH, USER_TIMEOUT_IN_SECONDS } from "../config/game.config"
+import { Field } from "../models/field"
+import { Pixel } from "../models/pixel"
+import { initializeField } from "../pages/api/game"
 
 interface IUserLock {
     _id: ObjectID
-    userId: string,
+    userId: string
     created: Date
 }
 
@@ -14,8 +17,14 @@ export interface IUserLockResult extends Partial<IUserLock> {
     isLocked: boolean
 }
 
-const USER_LOCKS = "user_locks"
+interface IFieldRecord {
+    _id?: ObjectID
+    value: Field
+}
+
 const DB_NAME = "game"
+const USER_LOCKS = "user_locks"
+const FIELDS = "fields"
 
 export class DatabaseService {
     private static _client: Promise<MongoClient>
@@ -36,6 +45,27 @@ export class DatabaseService {
     }
 
     private static async _initializeDB(userTimeoutInSeconds: number) {
+        await DatabaseService._initializeIndex(userTimeoutInSeconds)
+        await DatabaseService._initializeField(FIELD_WIDTH, FIELD_HEIGHT)
+    }
+
+    private static async _initializeField(width: number, height: number) {
+        // get exisitng field
+        const field = await (await DatabaseService._client)
+            .db(DB_NAME)
+            .collection<Pixel>(FIELDS)
+            .findOne()
+        if (field) return field
+
+        // create new field
+        const createFieldResult = await (await DatabaseService._client)
+            .db(DB_NAME)
+            .collection<Pixel>(FIELDS)
+            .insertMany(initializeField(width, height).flatMap(p => p))
+        return createFieldResult
+    }
+
+    private static async _initializeIndex(userTimeoutInSeconds: number) {
         DatabaseService._userTimeout = userTimeoutInSeconds
         // search cleanup index
         const indexExists = await (await DatabaseService._client)
