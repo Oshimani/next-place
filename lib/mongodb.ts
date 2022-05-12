@@ -69,17 +69,24 @@ export class DatabaseService {
         const result = await (await DatabaseService._client)
             .db(DB_NAME)
             .collection(USER_LOCKS)
-            .findOne<IUserLock>({ userId })
+            .find<IUserLock>({ userId })
+            .sort({ created: -1 })
+            .limit(1)
 
-        if (result) {
-            console.log("User is locked untill", add(result.created, { seconds: DatabaseService._userTimeout }))
-            return ({
-                ...result,
-                isLocked: true
-            })
+        if (await result.hasNext()) {
+            const lock = await result.next()
+            // mongo cleanup routine is not precise
+            // need to check if timeout has run out
+            if (add(lock!.created, { seconds: USER_TIMEOUT_IN_SECONDS }) > new Date()) {
+                console.log("User is locked untill", add(lock!.created, { seconds: DatabaseService._userTimeout }))
+                return ({
+                    ...lock,
+                    isLocked: true
+                })
+            }
         }
-        console.log(`${userId} is not locked`)
 
+        console.log(`${userId} is not locked`)
         return { isLocked: false }
     }
 
