@@ -5,7 +5,6 @@ import { GetServerSideProps } from 'next';
 import { useState, useEffect } from 'react';
 
 import io, { Socket } from 'socket.io-client'
-import { differenceInSeconds } from 'date-fns';
 
 import { AppShell, Navbar, useMantineTheme, Center, Title } from '@mantine/core';
 
@@ -25,7 +24,7 @@ let socket: Socket
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
 
-    await fetch('http://localhost:5000/api/game')
+    await fetch(`${process.env.NEXTAUTH_URL}/api/game`)
     return {
         props: {
             data: null
