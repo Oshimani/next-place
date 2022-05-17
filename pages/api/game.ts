@@ -1,8 +1,15 @@
-import { differenceInSeconds } from 'date-fns'
 import { NextApiRequest, NextApiResponse } from 'next'
+
 import { Server } from 'socket.io'
+
+import { getToken } from 'next-auth/jwt'
+import { getSession } from 'next-auth/react'
+
+import { differenceInSeconds } from 'date-fns'
+
 import { USER_TIMEOUT_IN_SECONDS } from '../../config/game.config'
 import { DatabaseService, IUserLockResult } from '../../lib/mongodb'
+
 import { SocketEvents } from '../../models/events'
 import { Field } from '../../models/field'
 import { Pixel } from '../../models/pixel'
@@ -47,6 +54,7 @@ const handleUserTryClaimPixel = async (pixel: Pixel, userId: string): Promise<[I
 }
 
 const SocketHandler = async (req: NextApiRequest, res: any) => {
+
   if (res.socket.server.io) {
     console.log('Socket is already running')
   } else {

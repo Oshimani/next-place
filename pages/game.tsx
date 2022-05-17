@@ -1,8 +1,10 @@
 import type { NextPage } from 'next'
-import Link from 'next/link';
 import { GetServerSideProps } from 'next';
+import Link from 'next/link';
 
 import { useState, useEffect } from 'react';
+
+import { getSession, useSession } from 'next-auth/react'
 
 import io, { Socket } from 'socket.io-client'
 
@@ -18,23 +20,30 @@ import { SocketEvents } from '../models/events';
 import AppContext from '../contexts/AppContext';
 
 import { IUserLockResult } from '../lib/mongodb';
+import NoAccess from '../components/NoAccess';
+import AppHeader from '../components/Header';
+import { Session } from 'next-auth';
 
 let socket: Socket
 
-
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
 
-    await fetch(`${process.env.NEXTAUTH_URL}/api/game`)
+    const session = await getSession(ctx)
+    if (session) {
+        await fetch(`${process.env.NEXTAUTH_URL}/api/game`)
+    }
+
     return {
         props: {
-            data: null
+            session
         }
     }
 }
 
-const Game: NextPage = () => {
+const Game: NextPage<{ session: Session | null }> = (props) => {
 
     const theme = useMantineTheme()
+    const { data: session } = useSession()
 
     const [selectedColor, setSelectedColor] = useState<string | null>(null)
 
@@ -83,7 +92,8 @@ const Game: NextPage = () => {
     }
 
     useEffect(() => {
-        initializeSocket()
+        if (props.session)
+            initializeSocket()
         return () => disconnectSocket()
     }, [])
 
@@ -92,11 +102,7 @@ const Game: NextPage = () => {
         <AppContext.Provider value={{ selectedColor, setSelectedColor, socket }}>
 
             <AppShell padding={0}
-                header={
-                    <Center pt='lg' pb='sm' sx={{ backgroundColor: theme.primaryColor, color: theme.white }}>
-                        <Link href="/"><Title sx={{ cursor: "pointer" }}>Next-Place</Title></Link>
-                    </Center>
-                }
+                header={<AppHeader />}
                 navbar={
                     <Navbar sx={{ backgroundColor: theme.colors.dark[0] }}
                         width={{ base: 300, sm: 100 }}
@@ -104,13 +110,21 @@ const Game: NextPage = () => {
                         <ColorPalette />
                     </Navbar>
                 }>
-                <>
-                    {field ?
-                        <Map field={field} />
-                        :
-                        <div>Loading Field</div>
-                    }
-                </>
+
+                {props.session ?
+                    <>
+                        {/* FIELD */}
+                        {field ?
+                            <Map field={field} />
+                            :
+                            <div>Loading Field</div>
+                        }
+                    </>
+
+                    :
+
+                    <NoAccess />
+                }
             </AppShell>
 
         </AppContext.Provider>
