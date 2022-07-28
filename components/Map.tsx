@@ -1,5 +1,4 @@
 import React from 'react'
-import { Grid, Paper } from '@mantine/core'
 
 import Pixel from './Pixel'
 import { IPixel } from '../models/field'

@@ -8,7 +8,7 @@ import { getSession, useSession } from 'next-auth/react'
 
 import io, { Socket } from 'socket.io-client'
 
-import { AppShell, Navbar, useMantineTheme } from '@mantine/core';
+import { AppShell, Navbar, ScrollArea, useMantineTheme } from '@mantine/core';
 
 import Map from '../components/Map'
 import ColorPalette from '../components/ColorPalette';
@@ -43,7 +43,7 @@ const Game: NextPage<{ session: Session | null }> = (props) => {
     const theme = useMantineTheme()
     const { data: session } = useSession()
 
-    const [selectedColor, setSelectedColor] = useState<string | null>(null)
+    const [selectedColor, setSelectedColor] = useState<string>("black")
     const [fieldDimmensions, setFieldDimmensions] = useState({ x: 0, y: 0 })
 
     const [pixels, setPixels] = useState<Array<IPixel> | null>(null)
@@ -84,6 +84,7 @@ const Game: NextPage<{ session: Session | null }> = (props) => {
     }
 
     useEffect(() => {
+
         if (props.session)
             initializeSocket()
         return () => disconnectSocket()
@@ -109,7 +110,9 @@ const Game: NextPage<{ session: Session | null }> = (props) => {
                     <>
                         {/* FIELD */}
                         {pixels && fieldDimmensions ?
-                            <Map pixels={pixels} fieldDimmensions={fieldDimmensions} />
+                            <ScrollArea style={{ height: "calc(100vh - 80px)" }}>
+                                <Map pixels={pixels} fieldDimmensions={fieldDimmensions} />
+                            </ScrollArea>
                             :
                             <div>Loading Field</div>
                         }
