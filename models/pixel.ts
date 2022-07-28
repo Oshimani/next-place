@@ -1,1 +1,0 @@
-export type Pixel = { color: string }

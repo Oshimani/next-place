@@ -8,18 +8,16 @@ import { getSession, useSession } from 'next-auth/react'
 
 import io, { Socket } from 'socket.io-client'
 
-import { AppShell, Navbar, useMantineTheme, Center, Title } from '@mantine/core';
+import { AppShell, Navbar, useMantineTheme } from '@mantine/core';
 
 import Map from '../components/Map'
 import ColorPalette from '../components/ColorPalette';
 
-import { convertFieldToDbRecord, Coordinates, Field, IPixelRecord, parseFieldDbRecord } from '../models/field';
-import { Pixel } from '../models/pixel';
+import { IPixel, updateField } from '../models/field';
 import { SocketEvents } from '../models/events';
 
 import AppContext from '../contexts/AppContext';
 
-import { IUserLockResult } from '../lib/mongodb';
 import NoAccess from '../components/NoAccess';
 import AppHeader from '../components/Header';
 import { Session } from 'next-auth';
@@ -46,19 +44,10 @@ const Game: NextPage<{ session: Session | null }> = (props) => {
     const { data: session } = useSession()
 
     const [selectedColor, setSelectedColor] = useState<string | null>(null)
-    const [fieldDimmensions, setFieldDimmensions] = useState({x: 0, y: 0})
+    const [fieldDimmensions, setFieldDimmensions] = useState({ x: 0, y: 0 })
 
-    const [field, setField] = useState<Field | null>(null)
+    const [pixels, setPixels] = useState<Array<IPixel> | null>(null)
 
-    const updateField = (coordinates: Coordinates, pixel: Pixel, field: Field) => {
-
-        if (field) {
-            field. set(coordinates, pixel)
-            console.log("update field", field, pixel);
-            return parseFieldDbRecord(convertFieldToDbRecord(field))
-        }
-        return null
-    }
 
     const initializeSocket = async () => {
         socket = io()
@@ -67,19 +56,18 @@ const Game: NextPage<{ session: Session | null }> = (props) => {
             console.log("connected", socket.id)
         })
 
-        socket.on(SocketEvents.JOIN, (args: { fieldDimmensions: { x: number, y: number }, pixels: Array<IPixelRecord> }) => {
+        socket.on(SocketEvents.JOIN, (args: { fieldDimmensions: { x: number, y: number }, pixels: Array<IPixel> }) => {
             const { pixels, fieldDimmensions } = args
-            const parsedField = parseFieldDbRecord(pixels)
-            console.log("joined", parsedField)
-            setField(parsedField)
+            console.log("joined", pixels)
+            setPixels(pixels)
             setFieldDimmensions(fieldDimmensions)
         })
 
-        socket.on(SocketEvents.UPDATE_PIXEL, (args: { coordinates: Coordinates, pixel: Pixel }) => {
-            const { coordinates, pixel } = args
-            console.log("Pixel updated from server", coordinates, pixel)
+        socket.on(SocketEvents.UPDATE_PIXEL, (args: { pixel: IPixel }) => {
+            const { pixel } = args
+            console.log("Pixel updated from server", pixel, pixel)
             // prevent stale closure
-            setField((prefField) => (updateField(coordinates, pixel, prefField!)))
+            setPixels((prefField) => ([...updateField(prefField!, pixel)!]))
         })
 
         socket.on(SocketEvents.CLAIM_PIXEL_FAILED, (response: { remainingTimeout: number }) => {
@@ -102,6 +90,8 @@ const Game: NextPage<{ session: Session | null }> = (props) => {
     }, [])
 
 
+
+
     return (
         <AppContext.Provider value={{ selectedColor, setSelectedColor, socket }}>
 
@@ -118,8 +108,8 @@ const Game: NextPage<{ session: Session | null }> = (props) => {
                 {props.session ?
                     <>
                         {/* FIELD */}
-                        {field && fieldDimmensions ?
-                            <Map field={field} fieldDimmensions={fieldDimmensions} />
+                        {pixels && fieldDimmensions ?
+                            <Map pixels={pixels} fieldDimmensions={fieldDimmensions} />
                             :
                             <div>Loading Field</div>
                         }

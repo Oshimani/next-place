@@ -7,37 +7,29 @@ import { getSession } from 'next-auth/react'
 
 import { differenceInSeconds } from 'date-fns'
 
-import { USER_TIMEOUT_IN_SECONDS } from '../../config/game.config'
+import { FIELD_HEIGHT, FIELD_WIDTH, USER_TIMEOUT_IN_SECONDS } from '../../config/game.config'
 import { DatabaseService, IUserLockResult } from '../../lib/mongodb'
 
 import { SocketEvents } from '../../models/events'
-import { convertFieldToDbRecord, Coordinates, Field } from '../../models/field'
-import { Pixel } from '../../models/pixel'
+import { Coordinates, IPixel, updateField } from '../../models/field'
 
-export const initializeField = (dimX: number, dimY: number) => {
-  let f: Field = new Map()
+const initializeField = (dimX: number, dimY: number) => {
+  let f: Array<IPixel> = []
   for (let y = 0; y < dimY; y++) {
     for (let x = 0; x < dimX; x++) {
-      f.set({ x, y }, { color: "white" })
+      f.push({ x, y, color: "white" })
     }
   }
   return f
 }
-const fieldDimmensions = { x: 4, y: 4 }
+const fieldDimmensions = { x: FIELD_WIDTH, y: FIELD_HEIGHT }
 let field = initializeField(fieldDimmensions.x, fieldDimmensions.y)
 
-const updateField = (coordinates: Coordinates, pixel: Pixel) => {
-  if (field) {
-    // this does not work???
-    field.set(coordinates, pixel)
-    return field
-  }
-  return null
-}
+
 
 let dbService: DatabaseService
 
-const handleUserTryClaimPixel = async (coordinates: Coordinates, pixel: Pixel, userId: string): Promise<[IUserLockResult | null, IUserLockResult | null]> => {
+const handleUserTryClaimPixel = async ( pixel: IPixel, userId: string): Promise<[IUserLockResult | null, IUserLockResult | null]> => {
   // check if user may claim pixel
   const lockResult = await dbService.isUserLocked(userId)
   // user is locket and may not claim pixel
@@ -46,15 +38,13 @@ const handleUserTryClaimPixel = async (coordinates: Coordinates, pixel: Pixel, u
   // lock user
   const newLockResult = await dbService.lockUser(userId)
   // update field
-  field = updateField(coordinates, pixel)!
+  field = updateField(field,  pixel)!
 
   // save field to db
-  await dbService.updateField(coordinates, pixel)
+  await dbService.updateField( pixel)
 
   return [newLockResult, null]
 }
-
-
 
 const SocketHandler = async (req: NextApiRequest, res: any) => {
 
@@ -76,19 +66,19 @@ const SocketHandler = async (req: NextApiRequest, res: any) => {
 
       // send current field to new user
       console.log("Sending field to user", socket.id)
-      io.to(socket.id).emit(SocketEvents.JOIN, { fieldDimmensions, pixels: convertFieldToDbRecord(field) })
+      io.to(socket.id).emit(SocketEvents.JOIN, { fieldDimmensions, pixels: field })
       // socket.emit(SocketEvents.JOIN, field)
 
       // user claims pixel
-      socket.on(SocketEvents.CLAIM_PIXEL, async (args: { coordinates: Coordinates, pixel: Pixel }) => {
-        const { coordinates, pixel } = args
-        console.log(`${socket.id} claimed pixel @(${coordinates.x}|${coordinates.y}) color: ${pixel.color}`)
+      socket.on(SocketEvents.CLAIM_PIXEL, async (args: {  pixel: IPixel }) => {
+        const { pixel } = args
+        console.log(`${socket.id} claimed pixel @(${pixel.x}|${pixel.y}) color: ${pixel.color}`)
 
         // try claim pixel
-        const [claimSuccess, claimFail] = await handleUserTryClaimPixel(coordinates, pixel, socket.id)
+        const [claimSuccess, claimFail] = await handleUserTryClaimPixel(pixel, socket.id)
         if (claimSuccess) {
           // send updated pixel to all users
-          io.emit(SocketEvents.UPDATE_PIXEL, { coordinates, pixel })
+          io.emit(SocketEvents.UPDATE_PIXEL, { pixel })
         }
         else {
           // inform user about remaining timeout

@@ -2,10 +2,8 @@ import { ObjectID } from "bson"
 import { add } from "date-fns"
 import { MongoClient } from "mongodb"
 
-import { FIELD_HEIGHT, FIELD_WIDTH, USER_TIMEOUT_IN_SECONDS } from "../config/game.config"
-import { convertFieldToDbRecord, Coordinates, Field } from "../models/field"
-import { Pixel } from "../models/pixel"
-import { initializeField } from "../pages/api/game"
+import { USER_TIMEOUT_IN_SECONDS } from "../config/game.config"
+import { IPixel } from "../models/field"
 
 interface IUserLock {
     _id: ObjectID
@@ -29,28 +27,28 @@ export class DatabaseService {
     private static _userTimeout: number
 
 
-    constructor(connectionString: string, field: Field) {
+    constructor(connectionString: string, pixels: Array<IPixel>) {
         DatabaseService._client = new MongoClient(connectionString).connect()
-        DatabaseService._initializeDB(USER_TIMEOUT_IN_SECONDS, field)
+        DatabaseService._initializeDB(USER_TIMEOUT_IN_SECONDS, pixels)
     }
 
-    public static getInstance(connectionString: string, field: Field) {
+    public static getInstance(connectionString: string,  pixels: Array<IPixel>) {
         if (!DatabaseService._instance)
-            DatabaseService._instance = new DatabaseService(connectionString, field)
+            DatabaseService._instance = new DatabaseService(connectionString, pixels)
         return DatabaseService._instance
     }
 
-    private static async _initializeDB(userTimeoutInSeconds: number, field: Field) {
+    private static async _initializeDB(userTimeoutInSeconds: number,  pixels: Array<IPixel>) {
         await DatabaseService._initializeIndex(userTimeoutInSeconds)
-        await DatabaseService._initializeField(field)
+        await DatabaseService._initializeField(pixels)
     }
 
-    private static async _initializeField(field: Field) {
+    private static async _initializeField( pixels: Array<IPixel>) {
         // get exisitng field
         try {
             const existingField = await (await DatabaseService._client)
                 .db(DB_NAME)
-                .collection<Pixel>(PIXELS)
+                .collection<IPixel>(PIXELS)
                 .find()
             if ((await existingField.toArray()).length > 0)
                 return existingField
@@ -63,7 +61,7 @@ export class DatabaseService {
             const createFieldResult = await (await DatabaseService._client)
                 .db(DB_NAME)
                 .collection(PIXELS)
-                .insertMany(convertFieldToDbRecord(field))
+                .insertMany(pixels)
             return createFieldResult
         } catch (error) {
             console.error(error)
@@ -136,9 +134,8 @@ export class DatabaseService {
     //#endregion
 
     //#region FIELD FUNCTIONS
-    public async updateField(coordinates: Coordinates, pixel: Pixel) {
-        const { x, y } = coordinates
-        const { color } = pixel
+    public async updateField(pixel: IPixel) {
+        const { x, y, color } = pixel
         try {
             const updateResult = await (await DatabaseService._client)
                 .db(DB_NAME)
