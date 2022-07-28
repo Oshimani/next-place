@@ -3,7 +3,7 @@ import { add } from "date-fns"
 import { MongoClient } from "mongodb"
 
 import { FIELD_HEIGHT, FIELD_WIDTH, USER_TIMEOUT_IN_SECONDS } from "../config/game.config"
-import { Field } from "../models/field"
+import { convertFieldToDbRecord, Coordinates, Field } from "../models/field"
 import { Pixel } from "../models/pixel"
 import { initializeField } from "../pages/api/game"
 
@@ -17,14 +17,10 @@ export interface IUserLockResult extends Partial<IUserLock> {
     isLocked: boolean
 }
 
-interface IFieldRecord {
-    _id?: ObjectID
-    value: Field
-}
 
 const DB_NAME = "game"
 const USER_LOCKS = "user_locks"
-const FIELDS = "fields"
+const PIXELS = "pixels"
 
 export class DatabaseService {
     private static _client: Promise<MongoClient>
@@ -33,38 +29,49 @@ export class DatabaseService {
     private static _userTimeout: number
 
 
-    constructor(connectionString: string) {
+    constructor(connectionString: string, field: Field) {
         DatabaseService._client = new MongoClient(connectionString).connect()
-        DatabaseService._initializeDB(USER_TIMEOUT_IN_SECONDS)
+        DatabaseService._initializeDB(USER_TIMEOUT_IN_SECONDS, field)
     }
 
-    public static getInstance(connectionString: string) {
+    public static getInstance(connectionString: string, field: Field) {
         if (!DatabaseService._instance)
-            DatabaseService._instance = new DatabaseService(connectionString)
+            DatabaseService._instance = new DatabaseService(connectionString, field)
         return DatabaseService._instance
     }
 
-    private static async _initializeDB(userTimeoutInSeconds: number) {
+    private static async _initializeDB(userTimeoutInSeconds: number, field: Field) {
         await DatabaseService._initializeIndex(userTimeoutInSeconds)
-        await DatabaseService._initializeField(FIELD_WIDTH, FIELD_HEIGHT)
+        await DatabaseService._initializeField(field)
     }
 
-    private static async _initializeField(width: number, height: number) {
+    private static async _initializeField(field: Field) {
         // get exisitng field
-        const field = await (await DatabaseService._client)
-            .db(DB_NAME)
-            .collection<Pixel>(FIELDS)
-            .findOne()
-        if (field) return field
+        try {
+            const existingField = await (await DatabaseService._client)
+                .db(DB_NAME)
+                .collection<Pixel>(PIXELS)
+                .find()
+            if ((await existingField.toArray()).length > 0)
+                return existingField
+        } catch (error) {
+            console.error(error)
+        }
 
         // create new field
-        const createFieldResult = await (await DatabaseService._client)
-            .db(DB_NAME)
-            .collection<Pixel>(FIELDS)
-            .insertMany(initializeField(width, height).flatMap(p => p))
-        return createFieldResult
+        try {
+            const createFieldResult = await (await DatabaseService._client)
+                .db(DB_NAME)
+                .collection(PIXELS)
+                .insertMany(convertFieldToDbRecord(field))
+            return createFieldResult
+        } catch (error) {
+            console.error(error)
+        }
     }
 
+
+    //#region USER FUNCTIONS
     private static async _initializeIndex(userTimeoutInSeconds: number) {
         DatabaseService._userTimeout = userTimeoutInSeconds
         // search cleanup index
@@ -126,4 +133,21 @@ export class DatabaseService {
             .collection(USER_LOCKS)
             .findOneAndDelete({ userId })
     }
+    //#endregion
+
+    //#region FIELD FUNCTIONS
+    public async updateField(coordinates: Coordinates, pixel: Pixel) {
+        const { x, y } = coordinates
+        const { color } = pixel
+        try {
+            const updateResult = await (await DatabaseService._client)
+                .db(DB_NAME)
+                .collection(PIXELS)
+                .updateOne({ x, y }, { $set: { color } })
+            return updateResult
+        } catch (error) {
+            console.error(error)
+        }
+    }
+    //#endregion
 }

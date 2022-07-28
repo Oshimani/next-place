@@ -11,35 +11,33 @@ import { USER_TIMEOUT_IN_SECONDS } from '../../config/game.config'
 import { DatabaseService, IUserLockResult } from '../../lib/mongodb'
 
 import { SocketEvents } from '../../models/events'
-import { Field } from '../../models/field'
+import { convertFieldToDbRecord, Coordinates, Field } from '../../models/field'
 import { Pixel } from '../../models/pixel'
 
 export const initializeField = (dimX: number, dimY: number) => {
-  let f: Field = []
+  let f: Field = new Map()
   for (let y = 0; y < dimY; y++) {
-    let row: Array<Pixel> = []
     for (let x = 0; x < dimX; x++) {
-      row = [...row, { x, y, color: "white" }]
+      f.set({ x, y }, { color: "white" })
     }
-    f = [...f, row]
   }
   return f
 }
+const fieldDimmensions = { x: 4, y: 4 }
+let field = initializeField(fieldDimmensions.x, fieldDimmensions.y)
 
-let field = initializeField(64, 64)
-
-const updateField = (pixel: Pixel) => {
+const updateField = (coordinates: Coordinates, pixel: Pixel) => {
   if (field) {
-    const { x, y, color } = pixel
-    field[y][x].color = color
-    return [...field]
+    // this does not work???
+    field.set(coordinates, pixel)
+    return field
   }
   return null
 }
 
 let dbService: DatabaseService
 
-const handleUserTryClaimPixel = async (pixel: Pixel, userId: string): Promise<[IUserLockResult | null, IUserLockResult | null]> => {
+const handleUserTryClaimPixel = async (coordinates: Coordinates, pixel: Pixel, userId: string): Promise<[IUserLockResult | null, IUserLockResult | null]> => {
   // check if user may claim pixel
   const lockResult = await dbService.isUserLocked(userId)
   // user is locket and may not claim pixel
@@ -48,10 +46,15 @@ const handleUserTryClaimPixel = async (pixel: Pixel, userId: string): Promise<[I
   // lock user
   const newLockResult = await dbService.lockUser(userId)
   // update field
-  field = updateField(pixel)!
+  field = updateField(coordinates, pixel)!
+
+  // save field to db
+  await dbService.updateField(coordinates, pixel)
 
   return [newLockResult, null]
 }
+
+
 
 const SocketHandler = async (req: NextApiRequest, res: any) => {
 
@@ -64,7 +67,7 @@ const SocketHandler = async (req: NextApiRequest, res: any) => {
     res.socket.server.io = io
 
     // initialize db connection
-    dbService = DatabaseService.getInstance(process.env.MONGODB_URI!)
+    dbService = DatabaseService.getInstance(process.env.MONGODB_URI!, field)
 
     io.on(SocketEvents.CONNECT, (socket) => {
       console.log("New User joined:", socket.id)
@@ -73,20 +76,22 @@ const SocketHandler = async (req: NextApiRequest, res: any) => {
 
       // send current field to new user
       console.log("Sending field to user", socket.id)
-      io.to(socket.id).emit(SocketEvents.JOIN, field)
+      io.to(socket.id).emit(SocketEvents.JOIN, { fieldDimmensions, pixels: convertFieldToDbRecord(field) })
       // socket.emit(SocketEvents.JOIN, field)
 
       // user claims pixel
-      socket.on(SocketEvents.CLAIM_PIXEL, async (pixel: Pixel) => {
-        console.log(`${socket.id} claimed pixel @(${pixel.x}|${pixel.y}) color: ${pixel.color}`)
+      socket.on(SocketEvents.CLAIM_PIXEL, async (args: { coordinates: Coordinates, pixel: Pixel }) => {
+        const { coordinates, pixel } = args
+        console.log(`${socket.id} claimed pixel @(${coordinates.x}|${coordinates.y}) color: ${pixel.color}`)
 
         // try claim pixel
-        const [claimSuccess, claimFail] = await handleUserTryClaimPixel(pixel, socket.id)
+        const [claimSuccess, claimFail] = await handleUserTryClaimPixel(coordinates, pixel, socket.id)
         if (claimSuccess) {
           // send updated pixel to all users
-          io.emit(SocketEvents.UPDATE_PIXEL, pixel)
+          io.emit(SocketEvents.UPDATE_PIXEL, { coordinates, pixel })
         }
         else {
+          // inform user about remaining timeout
           const remainingTimeout = USER_TIMEOUT_IN_SECONDS - differenceInSeconds(new Date(), claimFail!.created!)
           io.to(socket.id).emit(SocketEvents.CLAIM_PIXEL_FAILED, { remainingTimeout })
         }

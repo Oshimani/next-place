@@ -13,7 +13,7 @@ import { AppShell, Navbar, useMantineTheme, Center, Title } from '@mantine/core'
 import Map from '../components/Map'
 import ColorPalette from '../components/ColorPalette';
 
-import { Field } from '../models/field';
+import { convertFieldToDbRecord, Coordinates, Field, IPixelRecord, parseFieldDbRecord } from '../models/field';
 import { Pixel } from '../models/pixel';
 import { SocketEvents } from '../models/events';
 
@@ -46,16 +46,16 @@ const Game: NextPage<{ session: Session | null }> = (props) => {
     const { data: session } = useSession()
 
     const [selectedColor, setSelectedColor] = useState<string | null>(null)
+    const [fieldDimmensions, setFieldDimmensions] = useState({x: 0, y: 0})
 
     const [field, setField] = useState<Field | null>(null)
 
-    const updateField = (pixel: Pixel, field: Field) => {
+    const updateField = (coordinates: Coordinates, pixel: Pixel, field: Field) => {
 
         if (field) {
-            const { x, y, color } = pixel
-            field[y][x].color = color
+            field. set(coordinates, pixel)
             console.log("update field", field, pixel);
-            return [...field]
+            return parseFieldDbRecord(convertFieldToDbRecord(field))
         }
         return null
     }
@@ -67,15 +67,19 @@ const Game: NextPage<{ session: Session | null }> = (props) => {
             console.log("connected", socket.id)
         })
 
-        socket.on(SocketEvents.JOIN, (newField) => {
-            console.log("joined", newField)
-            setField(newField)
+        socket.on(SocketEvents.JOIN, (args: { fieldDimmensions: { x: number, y: number }, pixels: Array<IPixelRecord> }) => {
+            const { pixels, fieldDimmensions } = args
+            const parsedField = parseFieldDbRecord(pixels)
+            console.log("joined", parsedField)
+            setField(parsedField)
+            setFieldDimmensions(fieldDimmensions)
         })
 
-        socket.on(SocketEvents.UPDATE_PIXEL, (pixel) => {
-            console.log("Pixel updated from server", pixel)
+        socket.on(SocketEvents.UPDATE_PIXEL, (args: { coordinates: Coordinates, pixel: Pixel }) => {
+            const { coordinates, pixel } = args
+            console.log("Pixel updated from server", coordinates, pixel)
             // prevent stale closure
-            setField((prefField) => (updateField(pixel, prefField!)))
+            setField((prefField) => (updateField(coordinates, pixel, prefField!)))
         })
 
         socket.on(SocketEvents.CLAIM_PIXEL_FAILED, (response: { remainingTimeout: number }) => {
@@ -114,8 +118,8 @@ const Game: NextPage<{ session: Session | null }> = (props) => {
                 {props.session ?
                     <>
                         {/* FIELD */}
-                        {field ?
-                            <Map field={field} />
+                        {field && fieldDimmensions ?
+                            <Map field={field} fieldDimmensions={fieldDimmensions} />
                             :
                             <div>Loading Field</div>
                         }
