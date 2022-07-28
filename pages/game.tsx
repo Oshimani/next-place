@@ -65,9 +65,9 @@ const Game: NextPage<{ session: Session | null }> = (props) => {
 
         socket.on(SocketEvents.UPDATE_PIXEL, (args: { pixel: IPixel }) => {
             const { pixel } = args
-            console.log("Pixel updated from server", pixel, pixel)
+            console.log("Pixel updated from server", pixel)
             // prevent stale closure
-            setPixels((prefField) => ([...updateField(prefField!, pixel)!]))
+            setPixels((prefField) => (updateField(prefField!, pixel)!))
         })
 
         socket.on(SocketEvents.CLAIM_PIXEL_FAILED, (response: { remainingTimeout: number }) => {
@@ -94,7 +94,7 @@ const Game: NextPage<{ session: Session | null }> = (props) => {
 
 
     return (
-        <AppContext.Provider value={{ selectedColor, setSelectedColor, socket }}>
+        <AppContext.Provider value={{ selectedColor, setSelectedColor, socket, fieldDimmensions, setFieldDimmensions }}>
 
             <AppShell padding={0}
                 header={<AppHeader />}
@@ -111,7 +111,7 @@ const Game: NextPage<{ session: Session | null }> = (props) => {
                         {/* FIELD */}
                         {pixels && fieldDimmensions ?
                             <ScrollArea style={{ height: "calc(100vh - 80px)" }}>
-                                <Map pixels={pixels} fieldDimmensions={fieldDimmensions} />
+                                <Map pixels={pixels} />
                             </ScrollArea>
                             :
                             <div>Loading Field</div>
